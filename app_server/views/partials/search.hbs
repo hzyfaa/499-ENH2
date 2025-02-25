@@ -1,0 +1,141 @@
+<div id="search-box">
+    <div id="search-input-container">
+        <input type="text" id="search-input" placeholder="Search for an airport, city, or country...">
+        <div id="dropdown-results"></div>
+    </div>
+</div>
+<script>
+    //////////////////////
+    document.addEventListener("DOMContentLoaded", function () {
+        // set target elements
+        const searchInput = document.getElementById("search-input");
+        const dropdownResults = document.getElementById("dropdown-results");
+
+        // store cache
+        let cachedResults = [];
+
+        // Debounce function to delay function calls
+        function debounce(func, delay) {
+            let debounceTimeout;
+            return (...args) => {
+                clearTimeout(debounceTimeout);
+                debounceTimeout = setTimeout(() => func(...args), delay);
+            };
+        }
+
+        // Toggle the dropdown visibility
+        function toggleDropdownVisibility(visible) {
+            if (!visible) {
+                dropdownResults.style.display = "none";
+            } else {
+                dropdownResults.style.display = "block";
+            }
+
+        }
+
+        // Fetch search results from API
+        async function fetchSearchResults(query) {
+            // executes once user enters at least 3 letters
+            if (query.length < 3) {
+                toggleDropdownVisibility(false);
+                return;
+            }
+            // fetch api
+            try {
+                const response = await fetch(`/search?q=${query}`);
+                // Store initial results
+                cachedResults = await response.json();
+                updateDropdown(cachedResults);
+            } catch (error) {
+                console.error("Error fetching search results:", error);
+            }
+        }
+
+        // Filter the cached results based on the query
+        function filterResults(query) {
+            const words = query.toLowerCase().split(" ");
+
+            let filtered = cachedResults.filter((airport) =>
+                words.every((word) =>
+                    airport.name.toLowerCase().includes(word) ||
+                    airport.city.toLowerCase().includes(word) ||
+                    airport.country.toLowerCase().includes(word) ||
+                    airport.iata_code.toLowerCase().includes(word)
+                )
+            );
+            updateDropdown(filtered);
+        }
+
+        // Update the dropdown results
+        function updateDropdown(results) {
+            dropdownResults.innerHTML = "";
+
+            if (results.length === 0) {
+                dropdownResults.innerHTML = "<div style='padding:12px;color:#6b7280;'>No results found</div>";
+                toggleDropdownVisibility(true);
+                return;
+            };
+
+            // Create a list for results
+            const resultList = document.createElement("ul");
+            resultList.setAttribute('id', "result-list")
+
+            results.forEach(result => {
+                const item = document.createElement("li");
+                item.setAttribute("class", 'search-item');
+                item.setAttribute("style", "padding:16px 20px;font-weight:500;color:#333;position:relative;list-style:none;");
+
+                const div2 = document.createElement("div");
+                div2.setAttribute("style", "display:flex;flex-direction:column;overflow:hidden;gap:4px;");
+                const h3 = document.createElement("h3");
+                h3.setAttribute("style", "margin:0;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px;line-height:1.25;");
+                h3.textContent = `${result.city}, ${result.country}`;
+                const para = document.createElement("p");
+                para.setAttribute("style", "margin:0;color:rgba(0,0,0,0.4);font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4;");
+                para.textContent = `${result.iata_code} - ${result.name}`;
+
+                div2.append(h3, para);
+                item.appendChild(div2);
+
+                // Add event listeners for result items
+                item.addEventListener("mouseover", () => {
+                    item.style.backgroundColor = "#f3f4f6";
+                });
+                item.addEventListener("mouseout", () => {
+                    item.style.backgroundColor = "";
+                });
+                item.addEventListener("click", () => {
+                    searchInput.value = result.name;
+                    toggleDropdownVisibility(false);
+                });
+
+                resultList.appendChild(item);
+            });
+
+            dropdownResults.appendChild(resultList);
+            toggleDropdownVisibility(true);
+        };
+
+        // Hide the dropdown when clicking outside
+        document.addEventListener("click", (event) => {
+            if (!searchInput.contains(event.target) && !dropdownResults.contains(event.target)) {
+                toggleDropdownVisibility(false);
+            }
+        });
+
+        // Debounce the input event to delay the search
+        searchInput.addEventListener("input", debounce((event) => {
+            const query = event.target.value.trim();
+
+            if (query.includes(" ")) {
+                // Filter results if there are multiple words
+                filterResults(query);
+            } else {
+                // Fetch new results if it's the first word
+                fetchSearchResults(query);
+            }
+        }, 300));
+
+
+    });
+</script>
